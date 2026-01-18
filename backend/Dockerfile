@@ -46,6 +46,9 @@ COPY --from=deps --chown=nestjs:nodejs /app/node_modules ./node_modules
 # Copy package.json for reference (optional, for debugging)
 COPY --from=builder --chown=nestjs:nodejs /app/package.json ./
 
+# Create logs directory with proper permissions for non-root user
+RUN mkdir -p /app/logs && chown -R nestjs:nodejs /app/logs
+
 # Switch to non-root user
 USER nestjs
 
