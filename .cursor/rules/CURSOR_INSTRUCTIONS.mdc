@@ -1,0 +1,293 @@
+# CURSOR INSTRUCTIONS — Wallet App (2 Pages) — Production-Grade
+
+## 0) Immutable Context (Do Not Deviate)
+You are implementing a **2-page wallet web app** for a hiring assignment.
+
+Primary goals:
+- Correctness (balance, transactions)
+- Clean architecture (separation of concerns)
+- Production-grade patterns (validation, errors, loading states, tests)
+- Minimal, intuitive UI (no extra features)
+
+Non-goals:
+- No authentication
+- No multi-wallet support (single wallet per browser via localStorage)
+- No charts/analytics
+- No Kafka / queues
+- No over-engineering
+
+If anything is unclear, STOP and ask instead of assuming.
+
+---
+
+## 1) Tech Stack (Do Not Change)
+Frontend:
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS
+- UI: **Core components only** (prefer `shadcn/ui` or existing design system in repo)
+
+Backend:
+- NestJS + Fastify adapter
+- MongoDB
+- TypeScript
+
+Optional:
+- Redis caching ONLY for read endpoints (strictly optional, keep simple)
+
+---
+
+## 2) Architecture Rules (Non-Negotiable)
+
+### Frontend Layer
+**Components → Hooks → Services → API**
+- Components: UI only (render + event wiring)
+- Hooks: state + orchestration (loading/error, derived state)
+- Services: actual side effects (HTTP calls), no UI concerns
+- No business logic in components
+
+Allowed in components:
+- reading props
+- calling hook functions
+- rendering conditional UI states (loading/empty/error)
+- basic input binding (controlled components)
+
+NOT allowed in components:
+- calling `fetch/axios` directly
+- data transformations beyond display formatting
+- business rules (e.g., validating insufficient funds)
+- branching based on domain logic
+
+### Backend Layering
+**Controllervice → Repository(DB)**
+- Controller: request/response mapping only
+- Service: business logic + transaction rules + atomic updates
+- Repository: DB access only
+- Common reusable helpers in `utils/`
+
+NOT allowed:
+- DB queries in controllers
+- HTTP/response shaping inside repository
+- Duplicated helper code across services
+
+---
+
+## 3) UI/UX Requirements (2 Pages Only)
+
+### Page 1: Wallet (Route: `/`)
+State A: No wallet configured
+- Show:
+  - Username input (required)
+  - Initial balance input (optional)
+  - Submit button "Create Wallet"
+- On success:
+  - Save `walletId` in localStorage
+  - Transition UI to State B
+
+State B: Wallet configured
+- Show:
+  - Wallet name
+  - Wallet ID (copyable)
+  - Current balance
+- Show "New Transaction" section:
+  - Amount input (required)
+  - Toggle CREDIT/DEBIT (segmented control)
+  - Submit button (label changes: "Add Funds" / "Withdraw")
+- After transaction:
+  - Balance auto-updates immediately (refetch wallet OR use response value)
+  - Show toast success
+  - Clear amountnput
+
+Navigation:
+- Link/Button: "View all transactions →" to Page 2 (`/transactions`)
+
+LocalStorage:
+- Key: `walletId`
+- On app load, if walletId exists, fetch wallet and enter State B
+
+Reset (optional but helpful):
+- Small link "Reset wallet" clears localStorage and returns to State A
+
+### Page 2: Wallet Transactions (Route: `/transactions`)
+- Show:
+  - Table of all transactions for the current wallet
+- Must support:
+  - Pagination (server-side)
+  - Sorting by date and amount (server-side)
+  - Export CSV of **ALL transactions** (button)
+
+If no walletId exists in localStorage:
+- Show empty state with link back to `/`
+
+---
+
+## 4) Core Components Policy (Do NOT Build Custom Components)
+
+### Use these core primitives (prefer existing library)
+Use existing components from `shadcn/ui` (or existing UI library in repo):
+- Button
+- Input
+- Card
+- Table (or DataTable if already present)
+- Tabs/SegmentedControl (for CREDIT/DEBIT)
+- Dropdown/Select (for sorting)
+- Toast/Notification
+- Skeleton/Spinner
+- Pagination (use brary component if present; otherwise minimal controls)
+
+Rules:
+- Do NOT create custom Button/Input/Table unless it does not exist.
+- If a component exists, reuse it and style via props/classes.
+- Keep design minimal and consistent; no extra visual experimentation.
+
+---
+
+## 5) Frontend Folder Structure (Follow This)
+
+Suggested:
+- `app/`
+  - `page.tsx` (Wallet Page)  -> **uses hooks only**
+  - `transactions/page.tsx` (Transactions Page) -> **uses hooks only**
+- `components/`
+  - `wallet/` (pure UI components)
+    - `WalletSetupCard.tsx`
+    - `WalletOverviewCard.tsx`
+    - `TransactionForm.tsx`
+  - `transactions/`
+    - `TransactionsTable.tsx`
+    - `TransactionsToolbar.tsx` (sort + export)
+- `hooks/`
+  - `useWallet.ts` (fetch wallet, create wallet, store walletId)
+  - `useWalletTransactions.ts` (pagination, sorting, export)
+- `services/`
+  - `wallet.service.ts` (HTTP calls)
+  - `transactions.service.ts` (HTTP calls)
+- `lib/`
+  - `apiClient.ts` (fetch wrapper, base URL, error handling)
+  - `storage.ts` (localStorage helpers)
+- `utils/`
+  - `money.ts` (formatting, validation helpers)
+  - `date.ts` (formatting helpers)
+- `types/`
+  - `wallet.ts`, `transaction.ts`
+
+Component rules:
+- Components must accept props and callbacks.
+- Hooks return `data`, `loading`, `error`, and action methods.
+- Services return raw API results; throw typed errors.
+
+---
+
+## 6) Backend Folder Structure (Follow NestJS Conventions)
+
+Suggested modules:
+- `src/modules/wallet/`
+  - `wallet.controller.ts`
+  - `wallet.service.ts`
+  - `wallet.repo.ts` (DB layer)
+  - `dto/`
+    - `create-wallet.dto.ts`
+    - `transaction.dto.ts`
+  - `schemas/` (Mongoose schemas)
+    - `wallet.schema.ts`
+    - `transaction.schema.ts`
+- `src/common/`
+  - `utils/` (common functions)
+    - `money.util.ts` (decimal handling)
+    - `pagination.util.ts`
+    - `csv.util.ts`
+  - `filters/` (exception filter)
+  - `pipes/` (validation pipe if needed)
+  - `interceptors/` (logging, requestId)
+  - `constants/`
+
+Layering rules:
+- Controller calls Service only
+- Service calls Repo only
+- Repo does DB queries only
+
+---
+
+## 7) Backend Endpoint Contracts (Do Not Invent New Flows)
+
+Required endpoints (names can match assignment, but do NOT add extra):
+- POST `/wallet/setup`
+  - body: `{ name: string, balance?: string | number }`
+  - returns: `{ walletId: string }` + optionally wallet object
+- GET `/wallet/:id`
+  - returns wallet summary: `{ id, name, balance, updatedAt }`
+- POST `/wallet/:id/transaction`
+  - body: `{ amount: string | number, type: "CREDIT" | "DEBIT", description?: string }`
+  - returns: `{ transactionId, balanceAfter }`
+- GET `/wallet/:id/transactions?page=&limit=&sortBy=&sortOrder=`
+  - returns: `{ items: Transaction[], page, limit, total }`
+- GET `/wallet/:id/transactions/export`
+  - returns CSV stream/file for all transactions
+
+---
+
+## 8) Money + Precision Rules (Must Follow)
+- Support up to **4 decimal places**
+- Avoid floating point math issues:
+  - Store as integer minor units (e.g., multiply by 10000) OR store as string and normalize
+- Validate:
+  - amount > 0
+  - max 4 decimals
+- Debit must fail if insufficient funds
+
+Concurrency / atomicity:
+- Wallet balance updates must be atomic (single DB operation if possible)
+- Debit should use conditional update (balance >= amount) to avoid race issues
+- Always record a transaction with `balanceAfter`
+
+---
+
+## 9) Error Handling Rules
+
+Frontend:
+- Show inline errors for form fields
+- Show toast for API errors
+- Always handle loading state (disable buttons, show spinner)
+
+Backend:
+- Standard error response shape:
+  - `{ code: string, message: string, details?: any }`
+- Use proper HTTP codes:
+  - 400 validation
+  - 404 wallet not found
+  - 409 insufficient funds / conflict
+  - 500 unexpected
+
+---
+
+## 10) Unit Testing Requirements (Minimal but High Signal)
+
+Backend tests (priority):
+- Wallet create returns walletId
+- CREDIT increments balance + creates transaction
+- DEBIT fails when insufficient funds
+- Concurrency test: two debits cannot overspend
+- Pagination/sort returns deterministic results
+
+Frontend tests (targeted):
+- Wallet setup flow (submits and stores walletId)
+- Transaction submit updates balance UI
+- Transactions page pagination triggers fetch
+
+Do NOT chase vanity coverage %. Focus on critical paths.
+
+---
+
+## 11) Implementation Workflow for Cursor (How to Avoid Drift)
+When implementing, always reference section numbers.
+Example prompts:
+- "Implement Section 5 folder structure and Page 1 State A using core components only."
+- "Implement `useWallet` hook (Section 5) and ensure components contain zero business logic (Section 2)."
+- "Implement backend Controller->Service->Repo (Section 6) for POST /wallet/:id/transaction with atomic update (Section 8)."
+
+Rules for Cursor:
+- Do not refactor unrelated code
+- Do not add libraries unless asked
+- Do not change file structure without explicit permission
+- If unclear, ask before coding
+
