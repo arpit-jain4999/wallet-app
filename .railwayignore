@@ -1,0 +1,14 @@
+# Files to ignore when deploying to Railway
+# (if using Railway's auto-detection without Dockerfile)
+
+node_modules
+.git
+.gitignore
+*.md
+.env*
+.cache
+coverage
+.nyc_output
+dist
+.next
+out
