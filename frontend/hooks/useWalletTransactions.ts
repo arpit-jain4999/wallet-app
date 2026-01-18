@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { transactionsService } from '@/services/transactions.service';
 import { Transaction } from '@/types/transaction';
 import { getWalletId } from '@/lib/storage';
-import { ApiException } from '@/lib/apiClient';
+import { ApiError } from '@/lib/apiClient';
 import { toast } from 'sonner';
 
 export interface UseTransactionsOptions {
@@ -51,7 +51,7 @@ export function useWalletTransactions(options: UseTransactionsOptions = {}) {
       setTotal(response.total);
     } catch (err) {
       const errorMessage =
-        err instanceof ApiException
+        err instanceof ApiError
           ? err.message
           : 'Failed to load transactions';
       setError(errorMessage);
@@ -109,7 +109,7 @@ export function useWalletTransactions(options: UseTransactionsOptions = {}) {
       toast.success('Transactions exported successfully');
     } catch (err) {
       const errorMessage =
-        err instanceof ApiException
+        err instanceof ApiError
           ? err.message
           : 'Failed to export transactions';
       toast.error(errorMessage);

@@ -5,7 +5,7 @@ import { walletService } from '@/services/wallet.service';
 import { Wallet, CreateWalletRequest } from '@/types/wallet';
 import { TransactionRequest } from '@/types/transaction';
 import { getWalletId, setWalletId, clearWalletId } from '@/lib/storage';
-import { ApiException } from '@/lib/apiClient';
+import { ApiError } from '@/lib/apiClient';
 import { toast } from 'sonner';
 
 /**
@@ -66,12 +66,12 @@ export function useWallet() {
       setWallet(data);
     } catch (err) {
       const errorMessage =
-        err instanceof ApiException
+        err instanceof ApiError
           ? err.message
           : 'Failed to load wallet';
       setError(errorMessage);
       // If wallet not found, clear localStorage
-      if (err instanceof ApiException && err.status === 404) {
+      if (err instanceof ApiError && err.statusCode === 404) {
         clearWalletId();
       }
     } finally {
@@ -126,7 +126,7 @@ export function useWallet() {
         return response;
       } catch (err) {
         const errorMessage =
-          err instanceof ApiException
+          err instanceof ApiError
             ? err.message
             : 'Failed to create wallet';
         setError(errorMessage);
@@ -151,7 +151,7 @@ export function useWallet() {
    * @param {string} [data.description] - Optional transaction description
    * @returns {Promise<TransactionResponse>} Transaction response with updated balance
    * @throws {Error} If no wallet is loaded
-   * @throws {ApiException} If transaction fails (insufficient funds, validation error, etc.)
+   * @throws {ApiError} If transaction fails (insufficient funds, validation error, etc.)
    * 
    * @example
    * ```tsx
@@ -194,7 +194,7 @@ export function useWallet() {
         );
         
         const errorMessage =
-          err instanceof ApiException
+          err instanceof ApiError
             ? err.message
             : 'Failed to execute transaction';
         setError(errorMessage);

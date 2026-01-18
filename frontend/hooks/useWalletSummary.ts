@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { walletService } from '@/services/wallet.service';
 import { getWalletId } from '@/lib/storage';
-import { ApiException } from '@/lib/apiClient';
+import { ApiError } from '@/lib/apiClient';
 
 interface WalletSummaryData {
   totalCredits: number;
@@ -71,7 +71,7 @@ export function useWalletSummary() {
       });
     } catch (err) {
       const errorMessage =
-        err instanceof ApiException
+        err instanceof ApiError
           ? err.message
           : 'Failed to load summary';
       setError(errorMessage);

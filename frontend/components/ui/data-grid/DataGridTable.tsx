@@ -79,7 +79,7 @@ export function DataGridTable<T>({
                   <Button
                     variant={ButtonVariant.GHOST}
                     size="sm"
-                    onClick={() => onSort(column.sortField || column.field || column.id)}
+                    onClick={() => onSort(String(column.sortField || column.field || column.id))}
                     className="h-auto p-0 font-medium hover:bg-transparent"
                     aria-label={`Sort by ${column.header}`}
                   >

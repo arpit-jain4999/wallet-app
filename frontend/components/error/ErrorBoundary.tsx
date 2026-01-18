@@ -96,14 +96,14 @@ export class ErrorBoundary extends Component<Props, State> {
                     onClick={this.handleReset} 
                     className="flex-1"
                   >
-                    {BUTTON_LABELS.TRY_AGAIN}
+                    {BUTTON_LABELS.RETRY}
                   </Button>
                   <Button 
                     onClick={() => window.location.href = '/'} 
                     variant={ButtonVariant.OUTLINE}
                     className="flex-1"
                   >
-                    {NAV_LABELS.GO_HOME}
+                    {NAV_LABELS.HOME}
                   </Button>
                 </div>
               </div>

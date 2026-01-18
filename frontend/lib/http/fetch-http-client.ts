@@ -1,6 +1,6 @@
 import { API_CONFIG } from '@/config/constants';
 import { ApiError, NetworkError, ValidationError, NotFoundError, ServerError } from '../errors';
-import { retryWithBackoff, isRetryableError } from '../retry';
+import { retryIfRetryable } from '../retry';
 import { IHttpClient, RequestOptions } from './http-client.interface';
 
 /**
@@ -104,7 +104,7 @@ export class FetchHttpClient implements IHttpClient {
 
     // Retry logic for retryable requests
     if (retryable) {
-      return retryWithBackoff(makeRequest, isRetryableError);
+      return retryIfRetryable(makeRequest);
     }
 
     return makeRequest();
