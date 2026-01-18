@@ -82,7 +82,27 @@ export class WalletService {
   }
 
   /**
-   * Setup a new wallet with initial balance
+   * Setup a new wallet with optional initial balance
+   * 
+   * Creates a new wallet with a unique UUID v4 wallet ID.
+   * If initial balance is provided and > 0, creates an initial CREDIT transaction.
+   * 
+   * @param {string} name - Wallet owner name (required)
+   * @param {number} [balance] - Initial balance (optional, defaults to 0)
+   * @returns {Promise<Object>} Created wallet data
+   * @returns {string} id - Wallet ID (UUID v4)
+   * @returns {number} balance - Initial balance
+   * @returns {string} name - Wallet owner name
+   * @returns {Date} date - Creation date
+   * @returns {string} [transactionId] - Initial transaction ID (if balance > 0)
+   * @throws {BadRequestException} If initial balance is invalid (negative, > 4 decimal places)
+   * 
+   * @example
+   * ```ts
+   * const wallet = await walletService.setupWallet('John Doe', 100.50);
+   * console.log(wallet.id); // UUID v4
+   * console.log(wallet.balance); // 100.50
+   * ```
    */
   async setupWallet(name: string, balance?: number) {
     this.logger.log(`Setting up wallet for: ${name}`, 'WalletService');
@@ -127,7 +147,24 @@ export class WalletService {
   }
 
   /**
-   * Get wallet details by ID
+   * Get wallet details by wallet ID
+   * 
+   * Retrieves wallet information including current balance.
+   * Converts balance from minor units to major units for API response.
+   * 
+   * @param {string} walletId - Wallet ID to retrieve (UUID v4)
+   * @returns {Promise<Object>} Wallet data
+   * @returns {string} id - Wallet ID
+   * @returns {number} balance - Current balance (converted from minor units)
+   * @returns {string} name - Wallet owner name
+   * @returns {Date} date - Last update date
+   * @throws {NotFoundException} If wallet not found
+   * 
+   * @example
+   * ```ts
+   * const wallet = await walletService.getWallet('wallet-id-uuid');
+   * console.log(wallet.balance); // Current balance
+   * ```
    */
   async getWallet(walletId: string) {
     this.logger.log(`Fetching wallet: ${walletId}`, 'WalletService');

@@ -154,7 +154,30 @@ export class TransactionService {
   }
 
   /**
-   * Processes a transaction (credit or debit) on a wallet
+   * Execute a credit or debit transaction on a wallet
+   * 
+   * Processes a transaction atomically with balance update to prevent race conditions.
+   * For debit transactions, checks for sufficient funds and uses atomic updates with conditions.
+   * 
+   * @param {string} walletId - Wallet ID to transact on (UUID v4)
+   * @param {number} amount - Transaction amount (positive for CREDIT, negative for DEBIT)
+   * @param {string} [description] - Optional transaction description
+   * @returns {Promise<Object>} Transaction result
+   * @returns {number} balance - New balance after transaction
+   * @returns {string} transactionId - Created transaction ID
+   * @throws {BadRequestException} If amount is invalid (0, negative for credit, > 4 decimal places)
+   * @throws {NotFoundException} If wallet not found
+   * @throws {ConflictException} If insufficient funds (for debit) or concurrent update detected
+   * 
+   * @example
+   * ```ts
+   * // Credit transaction
+   * const result = await transactionService.transact('wallet-id', 50.25, 'Payment received');
+   * console.log(result.balance); // New balance
+   * 
+   * // Debit transaction
+   * const result2 = await transactionService.transact('wallet-id', -25.50, 'Payment made');
+   * ```
    */
   async transact(
     walletId: string,
@@ -190,7 +213,42 @@ export class TransactionService {
   }
 
   /**
-   * Get paginated transactions for a wallet
+   * Get paginated transactions for a wallet with filtering and sorting
+   * 
+   * Retrieves transactions with server-side pagination, sorting, searching, and filtering.
+   * Validates date range (fromDate must be <= toDate) and ensures wallet exists.
+   * 
+   * @param {string} walletId - Wallet ID to get transactions for (UUID v4)
+   * @param {number} skip - Number of records to skip (for pagination)
+   * @param {number} limit - Maximum number of records to return
+   * @param {string} [sortBy] - Field to sort by ('date', 'amount')
+   * @param {'asc' | 'desc'} [sortOrder] - Sort order (default: 'desc')
+   * @param {string} [search] - Search query (searches in transaction description)
+   * @param {'CREDIT' | 'DEBIT'} [type] - Filter by transaction type
+   * @param {Date} [fromDate] - Filter transactions from this date (inclusive)
+   * @param {Date} [toDate] - Filter transactions up to this date (inclusive)
+   * @returns {Promise<Object>} Paginated transactions result
+   * @returns {Transaction[]} items - Array of transaction objects (converted from minor units)
+   * @returns {number} total - Total number of transactions matching filters
+   * @throws {BadRequestException} If date range is invalid (fromDate > toDate)
+   * @throws {NotFoundException} If wallet not found
+   * 
+   * @example
+   * ```ts
+   * const result = await transactionService.getTransactions(
+   *   'wallet-id',
+   *   0,    // skip
+   *   25,   // limit
+   *   'date',  // sortBy
+   *   'desc',  // sortOrder
+   *   'payment', // search
+   *   'CREDIT', // type filter
+   *   new Date('2026-01-01'), // fromDate
+   *   new Date('2026-01-31')  // toDate
+   * );
+   * console.log(result.items); // Transactions array
+   * console.log(result.total); // Total count
+   * ```
    */
   async getTransactions(
     walletId: string,
@@ -268,6 +326,28 @@ export class TransactionService {
 
   /**
    * Get transaction summary (totals) for a wallet
+   */
+  /**
+   * Get transaction summary (totals) for a wallet
+   * 
+   * Returns aggregated statistics: total credits, total debits, and total transaction count.
+   * Uses MongoDB aggregation for efficient calculation on the database side.
+   * Converts amounts from minor units to major units for API response.
+   * 
+   * @param {string} walletId - Wallet ID to get summary for (UUID v4)
+   * @returns {Promise<Object>} Transaction summary
+   * @returns {number} totalCredits - Total credits amount (converted from minor units)
+   * @returns {number} totalDebits - Total debits amount (converted from minor units)
+   * @returns {number} totalTransactions - Total number of transactions
+   * @throws {NotFoundException} If wallet not found
+   * 
+   * @example
+   * ```ts
+   * const summary = await transactionService.getTransactionSummary('wallet-id');
+   * console.log(summary.totalCredits); // Total credits
+   * console.log(summary.totalDebits);  // Total debits
+   * console.log(summary.totalTransactions); // Transaction count
+   * ```
    */
   async getTransactionSummary(walletId: string) {
     // Ensure wallet exists
