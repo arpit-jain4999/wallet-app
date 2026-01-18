@@ -7,7 +7,7 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy package files
-COPY backend/package*.json ./
+COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
 # Build the application
@@ -15,13 +15,13 @@ FROM base AS builder
 WORKDIR /app
 
 # Copy package files
-COPY backend/package*.json ./
+COPY package*.json ./
 RUN npm ci
 
 # Copy source code
-COPY backend/tsconfig.json ./
-COPY backend/nest-cli.json ./
-COPY backend/src ./src
+COPY tsconfig.json ./
+COPY nest-cli.json ./
+COPY src ./src
 
 # Build TypeScript to JavaScript
 RUN npm run build
