@@ -17,7 +17,8 @@ class EnvironmentVariables {
   PORT?: number = 3001;
 
   @IsString()
-  MONGODB_URI: string;
+  @IsOptional() // Allow it to be optional, fallback handled in app.module.ts
+  MONGODB_URI?: string;
 
   @IsString()
   @IsOptional()

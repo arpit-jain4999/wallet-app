@@ -21,5 +21,5 @@ export class Wallet {
 export const WalletSchema = SchemaFactory.createForClass(Wallet);
 
 // Indexes for performance
-WalletSchema.index({ walletId: 1 }); // Already unique, but explicit index for clarity
+// Note: walletId already has an index from unique: true, no need to add it again
 WalletSchema.index({ createdAt: -1 }); // For sorting by creation date
