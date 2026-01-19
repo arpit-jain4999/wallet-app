@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback } from 'react';
+import React, { useCallback, useImperativeHandle, forwardRef, useRef } from 'react';
 import { DataGrid } from '@/components/ui/data-grid/DataGrid';
-import { ColumnDef } from '@/components/ui/data-grid/types';
+import { ColumnDef, DataGridRef } from '@/components/ui/data-grid/types';
 import { Transaction } from '@/types/transaction';
 import { transactionsService } from '@/services/transactions.service';
 import { Button } from '@/components/ui/button';
@@ -21,9 +21,15 @@ interface RecentTransactionsProps {
   onNewTransaction: () => void;
 }
 
-export function RecentTransactions({
-  onNewTransaction,
-}: RecentTransactionsProps) {
+export interface RecentTransactionsRef {
+  refresh: () => void;
+}
+
+export const RecentTransactions = forwardRef<RecentTransactionsRef, RecentTransactionsProps>(
+  function RecentTransactions(
+    { onNewTransaction },
+    ref,
+  ) {
   const columns: ColumnDef<Transaction>[] = [
     {
       id: 'date',
@@ -113,8 +119,19 @@ export function RecentTransactions({
     };
   }, []);
 
+  // Ref for DataGrid to expose refetch
+  const dataGridRef = useRef<DataGridRef<Transaction>>(null);
+
+  // Expose refresh function via ref
+  useImperativeHandle(ref, () => ({
+    refresh: () => {
+      dataGridRef.current?.refetch();
+    },
+  }), []);
+
   return (
     <DataGrid<Transaction>
+      ref={dataGridRef}
       columns={columns}
       fetchPage={fetchTop10Transactions}
       header={{
@@ -140,5 +157,5 @@ export function RecentTransactions({
       }}
     />
   );
-}
+});
 

@@ -122,6 +122,10 @@ export type FilterOptions = {
   };
 };
 
+export type DataGridRef<T> = {
+  refetch: () => void;
+};
+
 export type DataGridProps<T> = {
   columns: ColumnDef<T>[];
   fetchPage: FetchGridPage<T>;
@@ -144,4 +148,7 @@ export type DataGridProps<T> = {
   emptyState?: EmptyStateConfig;
 
   className?: string;
+
+  // Ref for imperative access
+  ref?: React.Ref<DataGridRef<T>>;
 };

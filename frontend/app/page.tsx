@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useWalletContext } from '@/contexts/WalletContext';
 import { useWalletSummary } from '@/hooks/useWalletSummary';
 import { WalletSetupCard } from '@/components/wallet/WalletSetupCard';
 import { WalletSummary } from '@/components/wallet/WalletSummary';
-import { RecentTransactions } from '@/components/wallet/RecentTransactions';
+import { RecentTransactions, RecentTransactionsRef } from '@/components/wallet/RecentTransactions';
 import { NewTransactionModal } from '@/components/wallet/NewTransactionModal';
 import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
@@ -23,8 +23,6 @@ export default function HomePage() {
     resetWallet,
   } = useWalletContext();
 
-  // Note: RecentTransactions now uses DataGrid which fetches its own data
-
   const {
     summary,
     loading: summaryLoading,
@@ -33,10 +31,12 @@ export default function HomePage() {
 
   const [showNewTransaction, setShowNewTransaction] = useState(false);
   const [copied, setCopied] = useState(false);
+  const recentTransactionsRef = useRef<RecentTransactionsRef>(null);
 
   const handleTransactionSuccess = async () => {
     await refreshSummary();
-    // DataGrid will automatically refresh on its own
+    // Refresh the recent transactions table
+    recentTransactionsRef.current?.refresh();
   };
 
   const handleCopy = () => {
@@ -129,6 +129,7 @@ export default function HomePage() {
 
       {/* Recent Transactions */}
       <RecentTransactions
+        ref={recentTransactionsRef}
         onNewTransaction={() => setShowNewTransaction(true)}
       />
 

@@ -91,6 +91,9 @@ export function useDataGrid<T>(args: {
     initialState?.search?.query || ''
   );
 
+  // Refresh counter to force refetch
+  const [refreshCounter, setRefreshCounter] = useState(0);
+
   // Abort controller for cancelling in-flight requests
   const abortControllerRef = useRef<AbortController | null>(null);
   
@@ -177,7 +180,7 @@ export function useDataGrid<T>(args: {
     return () => {
       abortController.abort();
     };
-  }, [gridState]);
+  }, [gridState, refreshCounter]);
 
   const setPage = useCallback((pageIndex: number) => {
     setGridState((prev) => ({
@@ -233,7 +236,8 @@ export function useDataGrid<T>(args: {
   }, []);
 
   const refetch = useCallback(() => {
-    setGridState((prev) => ({ ...prev }));
+    // Increment refresh counter to trigger useEffect
+    setRefreshCounter((prev) => prev + 1);
   }, []);
 
   return {

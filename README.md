@@ -17,11 +17,8 @@ A modern, production-ready full-stack wallet management application built with N
 - [API Documentation](#-api-documentation)
 - [Development](#-development)
 - [Testing](#-testing)
-- [Deployment](#-deployment)
 - [Configuration](#-configuration)
 - [Performance](#-performance)
-- [Security](#-security)
-- [Contributing](#-contributing)
 
 ## ✨ Features
 
@@ -58,6 +55,8 @@ A modern, production-ready full-stack wallet management application built with N
   - Database indexes for optimal query performance
   - Request cancellation with AbortController
 
+- ⚠️ **Authentication/Authorization**: Not implemented (out of scope)
+
 ### Advanced Features
 
 - **Smart CSV Export**
@@ -85,8 +84,6 @@ A modern, production-ready full-stack wallet management application built with N
 | **TypeScript** | 5.x | Type safety |
 | **Tailwind CSS** | 3.x | Utility-first CSS framework |
 | **shadcn/ui** | Latest | Accessible UI components |
-| **Radix UI** | Latest | Unstyled, accessible primitives |
-| **Sonner** | 1.3.1 | Toast notifications |
 | **Jest** | Latest | Testing framework |
 | **React Testing Library** | Latest | Component testing |
 
@@ -179,7 +176,7 @@ The codebase follows SOLID principles:
 
 1. **Clone the repository**
 ```bash
-git clone <repository-url>
+git clone https://github.com/arpit-jain4999/wallet-app
 cd wallet-app
 ```
 
@@ -582,67 +579,3 @@ This approach prevents floating-point precision issues common in financial appli
 
 ### Security Notes
 
-- ⚠️ **Authentication/Authorization**: Not implemented (out of scope)
-
-## 🎯 Code Quality Standards
-
-### TypeScript
-
-- Strict type checking enabled
-- Minimal use of `any` type
-- Proper interfaces and types throughout
-- Generic types for reusability
-
-### Code Organization
-
-- **Single Responsibility Principle**: Each module has one clear purpose
-- **DRY (Don't Repeat Yourself)**: Shared utilities and components
-- **Consistent Naming**: Clear, descriptive names following conventions
-- **JSDoc Comments**: Comprehensive documentation for public APIs
-
-### Error Handling
-
-- **Custom Error Classes**: `ApiError`, `NetworkError`, `ValidationError`, etc.
-- **Error Boundaries**: React error boundaries for UI resilience
-- **Structured Logging**: Winston logs with context and levels
-- **User-Friendly Messages**: Toast notifications with clear error messages
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Contribution Guidelines
-
-- Follow TypeScript best practices
-- Write tests for new features
-- Update documentation as needed
-- Ensure all tests pass
-- Follow existing code style
-
-## 📄 License
-
-This project is private and proprietary.
-
-## 👥 Authors
-
-- Initial work by the development team
-
-## 🙏 Acknowledgments
-
-- [NestJS](https://nestjs.com/) - Robust Node.js framework
-- [Next.js](https://nextjs.org/) - Excellent React framework
-- [shadcn/ui](https://ui.shadcn.com/) - Beautiful UI components
-- [Radix UI](https://www.radix-ui.com/) - Accessible primitives
-- The open-source community
-
----
-
-**Built with ❤️ using modern web technologies**
-
-For more details, see:
-- [Backend README](backend/README.md)
-- [Frontend README](frontend/README.md)

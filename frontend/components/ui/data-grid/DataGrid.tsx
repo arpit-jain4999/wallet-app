@@ -1,7 +1,8 @@
 'use client';
 
+import { useImperativeHandle, forwardRef } from 'react';
 import { useDataGrid } from '@/hooks/useDataGrid';
-import { DataGridProps } from './types';
+import { DataGridProps, DataGridRef } from './types';
 import { Loading } from '@/components/ui/loading';
 import { SkeletonDataGrid } from '@/components/ui/skeleton';
 import { Typography } from '@/components/ui/typography';
@@ -30,20 +31,24 @@ import { TypographyVariant, ButtonVariant } from '@/lib/enums';
  * - Empty state
  * - Responsive design
  * - Customizable columns
+ * - Imperative refetch via ref
  */
-export function DataGrid<T>({
-  columns,
-  fetchPage,
-  header,
-  initialState,
-  search = { enabled: false },
-  pagination = { pageSizeOptions: [10, 25, 50, 100], showPageSizeSelector: true },
-  filters,
-  rowKey,
-  onRowClick,
-  emptyState,
-  className,
-}: DataGridProps<T>) {
+export const DataGrid = forwardRef(function DataGrid<T>(
+  {
+    columns,
+    fetchPage,
+    header,
+    initialState,
+    search = { enabled: false },
+    pagination = { pageSizeOptions: [10, 25, 50, 100], showPageSizeSelector: true },
+    filters,
+    rowKey,
+    onRowClick,
+    emptyState,
+    className,
+  }: DataGridProps<T>,
+  ref: React.Ref<DataGridRef<T>>,
+) {
   // Extract searchable fields from columns
   const searchableFields = columns
     .filter((col) => col.searchable)
@@ -71,7 +76,10 @@ export function DataGrid<T>({
     debounceMs: search.debounceMs || 300,
   });
 
-  console.log('isLoading', isLoading, rows);
+  // Expose refetch via ref
+  useImperativeHandle(ref, () => ({
+    refetch,
+  }), [refetch]);
 
   const totalPages = Math.ceil(totalRows / state.paging.pageSize);
   const currentPage = state.paging.pageIndex;
@@ -177,4 +185,6 @@ export function DataGrid<T>({
       )}
     </div>
   );
-}
+}) as <T extends Record<string, any>>(
+  props: DataGridProps<T> & { ref?: React.Ref<DataGridRef<T>> }
+) => JSX.Element;

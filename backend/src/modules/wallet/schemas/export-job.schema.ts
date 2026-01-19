@@ -9,10 +9,10 @@ export class ExportJob {
   @Prop({ required: true, unique: true })
   jobId: string;
 
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   walletId: string;
 
-  @Prop({ required: true, enum: ExportJobStatus, default: ExportJobStatus.PENDING, index: true })
+  @Prop({ required: true, enum: ExportJobStatus, default: ExportJobStatus.PENDING })
   status: ExportJobStatus;
 
   @Prop({ required: true, type: Number, default: 0, min: 0, max: 100 })

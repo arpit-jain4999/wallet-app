@@ -4,7 +4,7 @@
 
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'https://wallet-app-production-02e5.up.railway.app',
+  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
   TIMEOUT: 30000, // 30 seconds
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000, // 1 second
