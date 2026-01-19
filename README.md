@@ -313,20 +313,6 @@ wallet-app/
 └── README.md                   # This file
 ```
 
-## 📚 API Documentation
-
-### Interactive API Documentation
-
-Swagger/OpenAPI documentation is available at:
-- **Local**: http://localhost:3001/api
-- **Production**: `https://your-api-domain.com/api`
-
-The Swagger UI allows you to:
-- Browse all available endpoints
-- View request/response schemas
-- Test APIs directly from the browser
-- Download OpenAPI specification
-
 ### Core API Endpoints
 
 #### Wallet Operations
@@ -577,5 +563,70 @@ This approach prevents floating-point precision issues common in financial appli
 - ✅ **Atomic Updates**: Prevents race conditions in balance updates
 - ✅ **Environment Variables**: Validation on startup
 
-### Security Notes
+## 🚀 Enhancements and Future Scope
 
+The following features are planned for future releases to enhance the application's functionality, security, and performance:
+
+### 1. Authentication and Authorization
+
+**Current Status**: Not implemented (out of scope for initial release)
+
+**Planned Features**:
+- User authentication with JWT tokens
+- Role-based access control (RBAC)
+- Multi-user wallet support
+- Session management
+- Password reset functionality
+- OAuth integration (Google, etc.)
+- API key management for programmatic access
+
+**Benefits**:
+- Secure multi-user access
+- Personal wallet isolation
+- Audit trails for user actions
+- Enhanced security for production deployments
+
+### 2. Date Range Based Transactions Export
+
+**Current Status**: Export includes all transactions for a wallet
+
+**Planned Features**:
+- Date range picker in export UI
+- Filter transactions by custom date ranges
+- Export only transactions within selected period
+- Support for multiple date range formats (presets: Last 7 days, Last 30 days, Last 90 days, Custom range)
+- Export metadata including date range in CSV header
+- Bulk export with date range filters
+
+**Benefits**:
+- More granular export control
+- Reduced file sizes for large datasets
+- Better compliance with data retention policies
+- Improved user experience for financial reporting
+
+### 3. Caching Layer with Redis
+
+**Current Status**: Direct database queries for all operations
+
+**Planned Features**:
+- Redis integration for caching frequently accessed data
+- Cache wallet summaries and balances
+- Cache transaction lists with TTL
+- Cache invalidation strategies (write-through, write-behind)
+- Distributed caching for multi-instance deployments
+- Cache warming strategies
+- Redis cluster support for high availability
+
+**Benefits**:
+- Reduced database load
+- Faster response times for read-heavy operations
+- Better scalability for high-traffic scenarios
+- Improved user experience with instant data retrieval
+- Cost optimization by reducing database queries
+
+**Implementation Considerations**:
+- Cache key naming conventions
+- TTL configuration per data type
+- Cache invalidation on write operations
+- Fallback to database on cache misses
+- Monitoring and metrics for cache hit rates
