@@ -7,7 +7,7 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy package files
-COPY frontend/package*.json ./
+COPY package*.json ./
 RUN npm ci
 
 # Rebuild the source code only when needed
@@ -18,7 +18,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 
 # Copy source code
-COPY frontend ./
+COPY . ./
 
 # Build arguments (set in Railway dashboard or build command)
 ARG NEXT_PUBLIC_API_URL
