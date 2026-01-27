@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, ClientSession } from 'mongoose';
 import { Transaction, TransactionDocument } from '../schemas/transaction.schema';
 import { ITransactionRepository } from '../interfaces/transaction-repository.interface';
 
@@ -21,6 +21,7 @@ export class TransactionRepository implements ITransactionRepository {
     balanceMinorUnits: number,
     type: 'CREDIT' | 'DEBIT',
     description?: string,
+    session?: ClientSession,
   ): Promise<TransactionDocument> {
     const transaction = new this.transactionModel({
       walletId,
@@ -30,6 +31,9 @@ export class TransactionRepository implements ITransactionRepository {
       description,
       date: new Date(),
     });
+    if (session) {
+      return transaction.save({ session });
+    }
     return transaction.save();
   }
 

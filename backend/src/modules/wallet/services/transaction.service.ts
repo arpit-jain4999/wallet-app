@@ -6,13 +6,15 @@ import {
   Inject,
   LoggerService,
 } from '@nestjs/common';
+import { InjectConnection } from '@nestjs/mongoose';
+import { Connection, ClientSession } from 'mongoose';
 import { IWalletRepository } from '../interfaces/wallet-repository.interface';
 import { ITransactionRepository } from '../interfaces/transaction-repository.interface';
 import {
   toMinorUnits,
   fromMinorUnits,
-  validateAmount,
 } from '../../../common/utils/money.util';
+import { TransactionAmountValidator } from '../../../common/utils/transaction-amount.validator';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { TransactionType } from '@/common/enums';
 
@@ -27,24 +29,14 @@ export class TransactionService {
     private readonly walletRepo: IWalletRepository,
     @Inject('ITransactionRepository')
     private readonly transactionRepo: ITransactionRepository,
+    @InjectConnection() private readonly connection: Connection,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
   ) {}
 
   /**
-   * Validates transaction amount
-   * @private
-   */
-  private validateTransactionAmount(amount: number): void {
-    const validation = validateAmount(Math.abs(amount));
-    if (!validation.valid) {
-      this.logger.warn(`Invalid transaction amount: ${validation.error}`, 'TransactionService');
-      throw new BadRequestException(validation.error);
-    }
-  }
-
-  /**
    * Finds wallet by ID and throws NotFoundException if not found
+   * Used for operations that need wallet existence check before processing
    * @private
    */
   private async findWalletOrFail(walletId: string) {
@@ -58,14 +50,23 @@ export class TransactionService {
 
   /**
    * Creates a transaction record and returns formatted response
-   * @private
+   * Can be used by other services (e.g., WalletService for initial transactions)
+   * 
+   * @param {string} walletId - Wallet ID
+   * @param {number} amountMinorUnits - Transaction amount in minor units
+   * @param {number} newBalanceMinorUnits - New balance after transaction in minor units
+   * @param {TransactionType} transactionType - Transaction type (CREDIT/DEBIT)
+   * @param {string} [description] - Optional transaction description
+   * @param {ClientSession} [session] - Optional MongoDB session for transactions
+   * @returns {Promise<Object>} Transaction result with balance and transactionId
    */
-  private async createTransactionRecord(
+  async createTransactionRecord(
     walletId: string,
     amountMinorUnits: number,
     newBalanceMinorUnits: number,
     transactionType: TransactionType,
     description?: string,
+    session?: ClientSession,
   ): Promise<{ balance: number; transactionId: string }> {
     const transaction = await this.transactionRepo.createTransaction(
       walletId,
@@ -73,6 +74,7 @@ export class TransactionService {
       newBalanceMinorUnits,
       transactionType,
       description,
+      session,
     );
 
     return {
@@ -83,49 +85,87 @@ export class TransactionService {
 
   /**
    * Processes a debit transaction with atomic balance update
+   * Uses MongoDB transactions to ensure both transaction record creation and balance update succeed or fail together
+   * Flow: 1. Create transaction record, 2. Update wallet balance atomically
    * @private
    */
   private async processDebitTransaction(
     walletId: string,
     amountMinorUnits: number,
-    currentBalance: number,
     description?: string,
   ): Promise<{ balance: number; transactionId: string }> {
-    // Check sufficient funds
-    if (currentBalance < amountMinorUnits) {
-      this.logger.warn(
-        `Insufficient funds: walletId=${walletId}, required=${amountMinorUnits}, available=${currentBalance}`,
-        'TransactionService',
+    const session = await this.connection.startSession();
+    session.startTransaction();
+
+    try {
+      // Step 1: Get current wallet to calculate new balance
+      // We need this to create the transaction record with correct balance
+      const wallet = await this.walletRepo.findWalletById(walletId);
+      if (!wallet) {
+        await session.abortTransaction();
+        throw new NotFoundException('Wallet not found');
+      }
+
+      // Validate sufficient funds
+      if (wallet.balanceMinorUnits < amountMinorUnits) {
+        await session.abortTransaction();
+        this.logger.warn(
+          `Insufficient funds: walletId=${walletId}, required=${amountMinorUnits}, available=${wallet.balanceMinorUnits}`,
+          'TransactionService',
+        );
+        throw new ConflictException('Insufficient funds');
+      }
+
+      const newBalanceMinorUnits = wallet.balanceMinorUnits - amountMinorUnits;
+
+      // Step 2: Create transaction record FIRST (within transaction)
+      const transaction = await this.transactionRepo.createTransaction(
+        walletId,
+        amountMinorUnits,
+        newBalanceMinorUnits,
+        TransactionType.DEBIT,
+        description,
+        session,
       );
-      throw new ConflictException('Insufficient funds');
-    }
 
-    // Atomic update with condition to prevent race conditions
-    const updatedWallet = await this.walletRepo.updateBalanceAtomic(
-      walletId,
-      -amountMinorUnits,
-      { balanceMinorUnits: { $gte: amountMinorUnits } },
-    );
-
-    if (!updatedWallet) {
-      this.logger.warn(
-        `Concurrent update detected or insufficient funds: walletId=${walletId}`,
-        'TransactionService',
+      // Step 3: Update wallet balance atomically (within same transaction)
+      // The condition ensures wallet still exists and has sufficient funds
+      const updatedWallet = await this.walletRepo.updateBalanceAtomic(
+        walletId,
+        -amountMinorUnits,
+        { balanceMinorUnits: { $gte: amountMinorUnits } },
+        session,
       );
-      throw new ConflictException('Insufficient funds or concurrent update');
-    }
 
-    return this.createTransactionRecord(
-      walletId,
-      amountMinorUnits,
-      updatedWallet.balanceMinorUnits,
-      TransactionType.DEBIT,
-      description,
-    );
+      if (!updatedWallet) {
+        await session.abortTransaction();
+        this.logger.warn(
+          `Concurrent update detected: walletId=${walletId}, amount=${amountMinorUnits}`,
+          'TransactionService',
+        );
+        throw new ConflictException('Concurrent update detected');
+      }
+
+      // Commit transaction - both operations succeed or both fail
+      await session.commitTransaction();
+
+      return {
+        balance: fromMinorUnits(newBalanceMinorUnits),
+        transactionId: transaction._id.toString(),
+      };
+    } catch (error) {
+      // Rollback on any error
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 
   /**
    * Processes a credit transaction with atomic balance update
+   * Uses MongoDB transactions to ensure both transaction record creation and balance update succeed or fail together
+   * Flow: 1. Create transaction record, 2. Update wallet balance atomically
    * @private
    */
   private async processCreditTransaction(
@@ -133,24 +173,58 @@ export class TransactionService {
     amountMinorUnits: number,
     description?: string,
   ): Promise<{ balance: number; transactionId: string }> {
-    // Atomic update for credit
-    const updatedWallet = await this.walletRepo.updateBalanceAtomic(
-      walletId,
-      amountMinorUnits,
-    );
+    const session = await this.connection.startSession();
+    session.startTransaction();
 
-    if (!updatedWallet) {
-      this.logger.warn(`Wallet not found during credit: walletId=${walletId}`, 'TransactionService');
-      throw new NotFoundException('Wallet not found');
+    try {
+      // Step 1: Get current wallet to calculate new balance
+      const wallet = await this.walletRepo.findWalletById(walletId);
+      if (!wallet) {
+        await session.abortTransaction();
+        this.logger.warn(`Wallet not found: walletId=${walletId}`, 'TransactionService');
+        throw new NotFoundException('Wallet not found');
+      }
+
+      const newBalanceMinorUnits = wallet.balanceMinorUnits + amountMinorUnits;
+
+      // Step 2: Create transaction record FIRST (within transaction)
+      const transaction = await this.transactionRepo.createTransaction(
+        walletId,
+        amountMinorUnits,
+        newBalanceMinorUnits,
+        TransactionType.CREDIT,
+        description,
+        session,
+      );
+
+      // Step 3: Update wallet balance atomically (within same transaction)
+      const updatedWallet = await this.walletRepo.updateBalanceAtomic(
+        walletId,
+        amountMinorUnits,
+        undefined,
+        session,
+      );
+
+      if (!updatedWallet) {
+        await session.abortTransaction();
+        this.logger.warn(`Wallet not found during balance update: walletId=${walletId}`, 'TransactionService');
+        throw new NotFoundException('Wallet not found');
+      }
+
+      // Commit transaction - both operations succeed or both fail
+      await session.commitTransaction();
+
+      return {
+        balance: fromMinorUnits(newBalanceMinorUnits),
+        transactionId: transaction._id.toString(),
+      };
+    } catch (error) {
+      // Rollback on any error
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
     }
-
-    return this.createTransactionRecord(
-      walletId,
-      amountMinorUnits,
-      updatedWallet.balanceMinorUnits,
-      TransactionType.CREDIT,
-      description,
-    );
   }
 
   /**
@@ -189,26 +263,19 @@ export class TransactionService {
       'TransactionService',
     );
 
-    // Validate amount
-    this.validateTransactionAmount(amount);
-
-    // Find wallet or fail
-    const wallet = await this.findWalletOrFail(walletId);
+    // Validate amount using common validator
+    TransactionAmountValidator.validate(amount);
 
     // Determine transaction type
     const amountMinorUnits = toMinorUnits(Math.abs(amount));
     const isCredit = amount >= 0;
 
-    // Process transaction based on type
+    // Process transaction - wallet existence checked in updateBalanceAtomic
+    // This eliminates redundant DB call (previously: findById + findOneAndUpdate)
     if (isCredit) {
       return this.processCreditTransaction(walletId, amountMinorUnits, description);
     } else {
-      return this.processDebitTransaction(
-        walletId,
-        amountMinorUnits,
-        wallet.balanceMinorUnits,
-        description,
-      );
+      return this.processDebitTransaction(walletId, amountMinorUnits, description);
     }
   }
 

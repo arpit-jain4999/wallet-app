@@ -1,3 +1,4 @@
+import { ClientSession } from 'mongoose';
 import { TransactionDocument } from '../schemas/transaction.schema';
 
 /**
@@ -7,6 +8,7 @@ import { TransactionDocument } from '../schemas/transaction.schema';
 export interface ITransactionRepository {
   /**
    * Create a new transaction
+   * @param session - Optional MongoDB session for transactions
    */
   createTransaction(
     walletId: string,
@@ -14,6 +16,7 @@ export interface ITransactionRepository {
     balanceMinorUnits: number,
     type: 'CREDIT' | 'DEBIT',
     description?: string,
+    session?: ClientSession,
   ): Promise<TransactionDocument>;
 
   /**

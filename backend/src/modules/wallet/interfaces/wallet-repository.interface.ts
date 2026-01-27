@@ -1,3 +1,4 @@
+import { ClientSession } from 'mongoose';
 import { WalletDocument } from '../schemas/wallet.schema';
 
 /**
@@ -12,6 +13,7 @@ export interface IWalletRepository {
     name: string,
     balanceMinorUnits: number,
     walletId: string,
+    session?: ClientSession,
   ): Promise<WalletDocument>;
 
   /**
@@ -27,10 +29,12 @@ export interface IWalletRepository {
   /**
    * Update wallet balance atomically
    * @param condition - Optional condition for atomic update (e.g., check sufficient funds)
+   * @param session - Optional MongoDB session for transactions
    */
   updateBalanceAtomic(
     walletId: string,
     amountMinorUnits: number,
     condition?: { balanceMinorUnits: { $gte: number } },
+    session?: ClientSession,
   ): Promise<WalletDocument | null>;
 }

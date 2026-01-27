@@ -1,17 +1,16 @@
 import {
   Injectable,
   NotFoundException,
-  BadRequestException,
   Inject,
   LoggerService,
 } from '@nestjs/common';
 import { IWalletRepository } from '../interfaces/wallet-repository.interface';
-import { ITransactionRepository } from '../interfaces/transaction-repository.interface';
 import {
   toMinorUnits,
   fromMinorUnits,
-  validateAmount,
 } from '../../../common/utils/money.util';
+import { TransactionAmountValidator } from '../../../common/utils/transaction-amount.validator';
+import { TransactionService } from './transaction.service';
 import { v4 as uuidv4 } from 'uuid';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { TransactionType } from '@/common/enums';
@@ -25,23 +24,11 @@ export class WalletService {
   constructor(
     @Inject('IWalletRepository')
     private readonly walletRepo: IWalletRepository,
-    @Inject('ITransactionRepository')
-    private readonly transactionRepo: ITransactionRepository,
+    private readonly transactionService: TransactionService,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
   ) {}
 
-  /**
-   * Validates transaction amount
-   * @private
-   */
-  private validateTransactionAmount(amount: number): void {
-    const validation = validateAmount(Math.abs(amount));
-    if (!validation.valid) {
-      this.logger.warn(`Invalid transaction amount: ${validation.error}`, 'WalletService');
-      throw new BadRequestException(validation.error);
-    }
-  }
 
   /**
    * Finds wallet by ID and throws NotFoundException if not found
@@ -56,30 +43,6 @@ export class WalletService {
     return wallet;
   }
 
-  /**
-   * Creates a transaction record and returns formatted response
-   * @private
-   */
-  private async createTransactionRecord(
-    walletId: string,
-    amountMinorUnits: number,
-    newBalanceMinorUnits: number,
-    transactionType: TransactionType,
-    description?: string,
-  ): Promise<{ balance: number; transactionId: string }> {
-    const transaction = await this.transactionRepo.createTransaction(
-      walletId,
-      amountMinorUnits,
-      newBalanceMinorUnits,
-      transactionType,
-      description,
-    );
-
-    return {
-      balance: fromMinorUnits(newBalanceMinorUnits),
-      transactionId: transaction._id.toString(),
-    };
-  }
 
   /**
    * Setup a new wallet with optional initial balance
@@ -110,7 +73,7 @@ export class WalletService {
     
     // Validate initial balance (only if provided and non-zero)
     if (initialBalance > 0) {
-      this.validateTransactionAmount(initialBalance);
+      TransactionAmountValidator.validate(initialBalance);
     }
 
     const balanceMinorUnits = toMinorUnits(initialBalance);
@@ -125,9 +88,10 @@ export class WalletService {
     this.logger.log(`Wallet created successfully: ${walletId}`, 'WalletService');
 
     // Create initial transaction if balance > 0
+    // Use TransactionService to avoid code duplication
     let transactionId: string | undefined;
     if (balanceMinorUnits > 0) {
-      const result = await this.createTransactionRecord(
+      const result = await this.transactionService.createTransactionRecord(
         walletId,
         balanceMinorUnits,
         balanceMinorUnits,
