@@ -251,32 +251,25 @@ export class WalletController {
     @Query('walletId') walletId: string,
     @Res() reply: FastifyReply,
   ) {
-    // Check if we should use async export
-    const useAsync = await this.exportService.shouldUseAsyncExport(walletId);
+    const result = await this.exportService.exportTransactions(walletId);
 
-    if (useAsync) {
-      // Large dataset: Start async export and return job ID
-      const job = await this.exportService.startAsyncExport(walletId);
-      
+    if (result.type === 'job') {
       reply.header('Content-Type', 'application/json');
       reply.send({
         message: 'Export job started. Use the job ID to track progress.',
-        jobId: job.id,
-        status: job.status,
-        totalRecords: job.totalRecords,
-        pollUrl: `/export-jobs/${job.id}`,
-        sseUrl: `/export-jobs/${job.id}/stream`,
+        jobId: result.data.id,
+        status: result.data.status,
+        totalRecords: result.data.totalRecords,
+        pollUrl: `/export-jobs/${result.data.id}`,
+        sseUrl: `/export-jobs/${result.data.id}/stream`,
       });
     } else {
-      // Small dataset: Export synchronously
-      const csv = await this.exportService.exportTransactionsSync(walletId);
-      
       reply.header('Content-Type', 'text/csv');
       reply.header(
         'Content-Disposition',
         `attachment; filename="transactions-${walletId}.csv"`,
       );
-      reply.send(csv);
+      reply.send(result.data);
     }
   }
 

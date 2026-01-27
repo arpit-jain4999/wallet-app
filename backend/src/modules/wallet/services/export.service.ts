@@ -40,36 +40,70 @@ export class ExportService {
   }
 
   /**
+   * Export transactions (smart export - automatically chooses sync or async)
+   * Handles the business logic decision and execution
+   * @returns CSV string for small datasets, or ExportJob for large datasets
+   */
+  async exportTransactions(walletId: string): Promise<
+    | { type: 'csv'; data: string }
+    | { type: 'job'; data: ExportJob }
+  > {
+    const summary = await this.transactionRepo.getTransactionSummary(walletId);
+    const useAsync = summary.totalTransactions > EXPORT_CONFIG.SYNC_THRESHOLD;
+
+    if (useAsync) {
+      const job = await this.startAsyncExport(walletId, summary);
+      return { type: 'job', data: job };
+    } else {
+      const csv = await this.exportTransactionsSync(walletId, summary);
+      return { type: 'csv', data: csv };
+    }
+  }
+
+  /**
+   * Get transaction summary and determine if async export should be used
+   * Returns both the summary and the decision to avoid duplicate DB calls
+   * @deprecated Use exportTransactions() instead for unified export handling
+   */
+  async getExportDecision(walletId: string): Promise<{
+    summary: { totalCredits: number; totalDebits: number; totalTransactions: number };
+    useAsync: boolean;
+  }> {
+    const summary = await this.transactionRepo.getTransactionSummary(walletId);
+    return {
+      summary,
+      useAsync: summary.totalTransactions > EXPORT_CONFIG.SYNC_THRESHOLD,
+    };
+  }
+
+  /**
    * Check if wallet should use async export based on transaction count
+   * @deprecated Use getExportDecision() instead to avoid duplicate DB calls
    */
   async shouldUseAsyncExport(walletId: string): Promise<boolean> {
-    const summary = await this.transactionRepo.getTransactionSummary(walletId);
-    return summary.totalTransactions > EXPORT_CONFIG.SYNC_THRESHOLD;
+    const { useAsync } = await this.getExportDecision(walletId);
+    return useAsync;
   }
 
   /**
    * Export transactions synchronously (for small datasets)
    * Use this for datasets under SYNC_THRESHOLD
+   * @param summary - Transaction summary (to avoid duplicate DB call)
    */
-  async exportTransactionsSync(walletId: string): Promise<string> {
+  async exportTransactionsSync(
+    walletId: string,
+    summary?: { totalCredits: number; totalDebits: number; totalTransactions: number },
+  ): Promise<string> {
     this.logger.log(`Synchronous export for wallet: ${walletId}`, 'ExportService');
 
-    // Ensure wallet exists
-    const wallet = await this.walletRepo.findWalletById(walletId);
-    if (!wallet) {
-      throw new NotFoundException('Wallet not found');
-    }
-
-    // Get transaction count
-    const summary = await this.transactionRepo.getTransactionSummary(walletId);
+    const transactionSummary = summary || await this.transactionRepo.getTransactionSummary(walletId);
     
-    if (summary.totalTransactions > EXPORT_CONFIG.SYNC_THRESHOLD) {
+    if (transactionSummary.totalTransactions > EXPORT_CONFIG.SYNC_THRESHOLD) {
       throw new BadRequestException(
-        `Too many transactions (${summary.totalTransactions}). Use async export instead.`,
+        `Too many transactions (${transactionSummary.totalTransactions}). Use async export instead.`,
       );
     }
 
-    // Fetch all transactions
     const transactions = await this.transactionRepo.findAllTransactions(walletId);
 
     // Transform and generate CSV using worker thread
@@ -90,28 +124,24 @@ export class ExportService {
   /**
    * Start async export job (for large datasets)
    * Returns job ID for tracking
+   * @param summary - Transaction summary (to avoid duplicate DB call)
    */
-  async startAsyncExport(walletId: string): Promise<ExportJob> {
+  async startAsyncExport(
+    walletId: string,
+    summary?: { totalCredits: number; totalDebits: number; totalTransactions: number },
+  ): Promise<ExportJob> {
     this.logger.log(`Starting async export for wallet: ${walletId}`, 'ExportService');
 
-    // Ensure wallet exists
-    const wallet = await this.walletRepo.findWalletById(walletId);
-    if (!wallet) {
-      throw new NotFoundException('Wallet not found');
-    }
-
-    // Get transaction count
-    const summary = await this.transactionRepo.getTransactionSummary(walletId);
+    const transactionSummary = summary || await this.transactionRepo.getTransactionSummary(walletId);
     
-    if (summary.totalTransactions > EXPORT_CONFIG.MAX_RECORDS) {
+    if (transactionSummary.totalTransactions > EXPORT_CONFIG.MAX_RECORDS) {
       throw new BadRequestException(
-        `Too many transactions (${summary.totalTransactions}). Maximum allowed: ${EXPORT_CONFIG.MAX_RECORDS}`,
+        `Too many transactions (${transactionSummary.totalTransactions}). Maximum allowed: ${EXPORT_CONFIG.MAX_RECORDS}`,
       );
     }
 
-    // Create job in database
     const jobId = uuidv4();
-    const job = await this.exportJobRepo.createJob(walletId, jobId, summary.totalTransactions);
+    const job = await this.exportJobRepo.createJob(walletId, jobId, transactionSummary.totalTransactions);
 
     // Process in background (don't await)
     this.processExportJob(job.id).catch((error) => {
